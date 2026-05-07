@@ -557,8 +557,8 @@ h3 {
 
   .loop-progress,
   .speed-slider {
-    height: 28px;
-    min-height: 28px;
+    height: 24px;
+    min-height: 24px;
   }
 
   .loop-progress::-webkit-slider-runnable-track,
