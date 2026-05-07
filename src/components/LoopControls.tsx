@@ -1,4 +1,4 @@
-import type { CSSProperties, PointerEvent } from 'react';
+import { useCallback, useEffect, useRef, type CSSProperties, type PointerEvent } from 'react';
 import { Pause, Play } from 'lucide-react';
 import { formatTime } from '../utils/time';
 import type { LoopRange, RangeValidationResult } from '../utils/validation';
@@ -49,6 +49,7 @@ export function LoopControls({
   onRangeSeek,
   onPlaybackRateChange,
 }: LoopControlsProps) {
+  const speedSliderRef = useRef<HTMLInputElement>(null);
   const canLoop = !disabled && validation.ok;
   const showValidationError = !disabled && !validation.ok;
   const playbackLabel =
@@ -65,6 +66,50 @@ export function LoopControls({
       ? (activeSpeedIndex / (FINE_SPEED_OPTIONS.length - 1)) * 100
       : 0;
   const summaryEndTime = validation.ok ? validation.range.end : duration;
+
+  const setSpeedFromPercent = useCallback(
+    (percent: number) => {
+      const nextIndex = Math.round((percent / 100) * (FINE_SPEED_OPTIONS.length - 1));
+      const boundedIndex = Math.min(FINE_SPEED_OPTIONS.length - 1, Math.max(0, nextIndex));
+      onPlaybackRateChange(FINE_SPEED_OPTIONS[boundedIndex]);
+    },
+    [onPlaybackRateChange],
+  );
+
+  useEffect(() => {
+    const slider = speedSliderRef.current;
+
+    if (!slider) {
+      return;
+    }
+
+    const sliderElement = slider;
+
+    function handleSpeedTouch(event: TouchEvent) {
+      if (disabled) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const touch = event.touches[0] ?? event.changedTouches[0];
+
+      if (!touch) {
+        return;
+      }
+
+      setSpeedFromPercent(getClientPercent(sliderElement, touch.clientX));
+    }
+
+    sliderElement.addEventListener('touchstart', handleSpeedTouch, { passive: false });
+    sliderElement.addEventListener('touchmove', handleSpeedTouch, { passive: false });
+
+    return () => {
+      sliderElement.removeEventListener('touchstart', handleSpeedTouch);
+      sliderElement.removeEventListener('touchmove', handleSpeedTouch);
+    };
+  }, [disabled, setSpeedFromPercent]);
 
   function handleLoopPointerDown(event: PointerEvent<HTMLInputElement>) {
     if (disabled || !activeRange || !validation.ok) {
@@ -127,11 +172,7 @@ export function LoopControls({
   }
 
   function seekSpeedFromPointer(event: PointerEvent<HTMLInputElement>) {
-    const nextIndex = Math.round(
-      (getPointerPercent(event) / 100) * (FINE_SPEED_OPTIONS.length - 1),
-    );
-    const boundedIndex = Math.min(FINE_SPEED_OPTIONS.length - 1, Math.max(0, nextIndex));
-    onPlaybackRateChange(FINE_SPEED_OPTIONS[boundedIndex]);
+    setSpeedFromPercent(getPointerPercent(event));
   }
 
   return (
@@ -221,6 +262,7 @@ export function LoopControls({
           <span>{playbackRate}x</span>
         </div>
         <input
+          ref={speedSliderRef}
           className="speed-slider"
           type="range"
           min="0"
@@ -232,12 +274,7 @@ export function LoopControls({
           onPointerMove={handleSpeedPointerMove}
           onPointerUp={handlePointerEnd}
           onPointerCancel={handlePointerEnd}
-          onChange={(event) => {
-            const percent = Number(event.target.value);
-            const nextIndex = Math.round((percent / 100) * (FINE_SPEED_OPTIONS.length - 1));
-            const boundedIndex = Math.min(FINE_SPEED_OPTIONS.length - 1, Math.max(0, nextIndex));
-            onPlaybackRateChange(FINE_SPEED_OPTIONS[boundedIndex]);
-          }}
+          onChange={(event) => setSpeedFromPercent(Number(event.target.value))}
           disabled={disabled}
           aria-label="Playback speed"
         />
@@ -260,8 +297,12 @@ export function LoopControls({
 }
 
 function getPointerPercent(event: PointerEvent<HTMLInputElement>): number {
-  const rect = event.currentTarget.getBoundingClientRect();
-  const rawPercent = ((event.clientX - rect.left) / rect.width) * 100;
+  return getClientPercent(event.currentTarget, event.clientX);
+}
+
+function getClientPercent(element: HTMLElement, clientX: number): number {
+  const rect = element.getBoundingClientRect();
+  const rawPercent = ((clientX - rect.left) / rect.width) * 100;
 
   return Math.min(100, Math.max(0, rawPercent));
 }
