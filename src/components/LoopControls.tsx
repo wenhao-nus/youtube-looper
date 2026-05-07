@@ -1,4 +1,11 @@
-import { useCallback, useEffect, useRef, type CSSProperties, type PointerEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  type CSSProperties,
+  type PointerEvent,
+  type RefObject,
+} from 'react';
 import { Pause, Play } from 'lucide-react';
 import { formatTime } from '../utils/time';
 import type { LoopRange, RangeValidationResult } from '../utils/validation';
@@ -49,7 +56,9 @@ export function LoopControls({
   onRangeSeek,
   onPlaybackRateChange,
 }: LoopControlsProps) {
+  const loopSliderRef = useRef<HTMLInputElement>(null);
   const speedSliderRef = useRef<HTMLInputElement>(null);
+  const loopSliderDisabled = disabled || !activeRange || !validation.ok;
   const canLoop = !disabled && validation.ok;
   const showValidationError = !disabled && !validation.ok;
   const playbackLabel =
@@ -67,6 +76,17 @@ export function LoopControls({
       : 0;
   const summaryEndTime = validation.ok ? validation.range.end : duration;
 
+  const seekLoopFromPercent = useCallback(
+    (percent: number) => {
+      if (loopSliderDisabled) {
+        return;
+      }
+
+      onRangeSeek(percent);
+    },
+    [loopSliderDisabled, onRangeSeek],
+  );
+
   const setSpeedFromPercent = useCallback(
     (percent: number) => {
       const nextIndex = Math.round((percent / 100) * (FINE_SPEED_OPTIONS.length - 1));
@@ -76,40 +96,8 @@ export function LoopControls({
     [onPlaybackRateChange],
   );
 
-  useEffect(() => {
-    const slider = speedSliderRef.current;
-
-    if (!slider) {
-      return;
-    }
-
-    const sliderElement = slider;
-
-    function handleSpeedTouch(event: TouchEvent) {
-      if (disabled) {
-        return;
-      }
-
-      event.preventDefault();
-      event.stopPropagation();
-
-      const touch = event.touches[0] ?? event.changedTouches[0];
-
-      if (!touch) {
-        return;
-      }
-
-      setSpeedFromPercent(getClientPercent(sliderElement, touch.clientX));
-    }
-
-    sliderElement.addEventListener('touchstart', handleSpeedTouch, { passive: false });
-    sliderElement.addEventListener('touchmove', handleSpeedTouch, { passive: false });
-
-    return () => {
-      sliderElement.removeEventListener('touchstart', handleSpeedTouch);
-      sliderElement.removeEventListener('touchmove', handleSpeedTouch);
-    };
-  }, [disabled, setSpeedFromPercent]);
+  useSliderTouchGuard(loopSliderRef, loopSliderDisabled, seekLoopFromPercent);
+  useSliderTouchGuard(speedSliderRef, disabled, setSpeedFromPercent);
 
   function handleLoopPointerDown(event: PointerEvent<HTMLInputElement>) {
     if (disabled || !activeRange || !validation.ok) {
@@ -168,7 +156,7 @@ export function LoopControls({
   }
 
   function seekLoopFromPointer(event: PointerEvent<HTMLInputElement>) {
-    onRangeSeek(getPointerPercent(event));
+    seekLoopFromPercent(getPointerPercent(event));
   }
 
   function seekSpeedFromPointer(event: PointerEvent<HTMLInputElement>) {
@@ -229,6 +217,7 @@ export function LoopControls({
       )}
 
       <input
+        ref={loopSliderRef}
         className="loop-progress"
         type="range"
         min="0"
@@ -240,8 +229,8 @@ export function LoopControls({
         onPointerMove={handleLoopPointerMove}
         onPointerUp={handlePointerEnd}
         onPointerCancel={handlePointerEnd}
-        onChange={(event) => onRangeSeek(Number(event.target.value))}
-        disabled={disabled || !activeRange || !validation.ok}
+        onChange={(event) => seekLoopFromPercent(Number(event.target.value))}
+        disabled={loopSliderDisabled}
         aria-label="Seek within loop range"
       />
 
@@ -298,6 +287,47 @@ export function LoopControls({
 
 function getPointerPercent(event: PointerEvent<HTMLInputElement>): number {
   return getClientPercent(event.currentTarget, event.clientX);
+}
+
+function useSliderTouchGuard(
+  sliderRef: RefObject<HTMLInputElement>,
+  disabled: boolean,
+  onPercentChange: (percent: number) => void,
+) {
+  useEffect(() => {
+    const slider = sliderRef.current;
+
+    if (!slider) {
+      return;
+    }
+
+    const sliderElement = slider;
+
+    function handleSliderTouch(event: TouchEvent) {
+      if (disabled) {
+        return;
+      }
+
+      event.preventDefault();
+      event.stopPropagation();
+
+      const touch = event.touches[0] ?? event.changedTouches[0];
+
+      if (!touch) {
+        return;
+      }
+
+      onPercentChange(getClientPercent(sliderElement, touch.clientX));
+    }
+
+    sliderElement.addEventListener('touchstart', handleSliderTouch, { passive: false });
+    sliderElement.addEventListener('touchmove', handleSliderTouch, { passive: false });
+
+    return () => {
+      sliderElement.removeEventListener('touchstart', handleSliderTouch);
+      sliderElement.removeEventListener('touchmove', handleSliderTouch);
+    };
+  }, [disabled, onPercentChange, sliderRef]);
 }
 
 function getClientPercent(element: HTMLElement, clientX: number): number {
