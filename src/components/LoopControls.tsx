@@ -51,7 +51,8 @@ export function LoopControls({
 }: LoopControlsProps) {
   const canLoop = !disabled && validation.ok;
   const showValidationError = !disabled && !validation.ok;
-  const isPaused = playerStatus === 'paused' || playerStatus === 'ready';
+  const playbackLabel =
+    playerStatus === 'playing' ? 'Pause' : playerStatus === 'paused' ? 'Resume' : 'Play';
   const visibleSpeedPresets = SPEED_PRESETS;
   const activeSpeedIndex = findClosestSpeedIndex(playbackRate);
   const progress =
@@ -69,7 +70,16 @@ export function LoopControls({
       return;
     }
 
-    onRangeSeek(getPointerPercent(event));
+    event.currentTarget.setPointerCapture(event.pointerId);
+    seekLoopFromPointer(event);
+  }
+
+  function handleLoopPointerMove(event: PointerEvent<HTMLInputElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+
+    seekLoopFromPointer(event);
   }
 
   function handleSpeedPointerDown(event: PointerEvent<HTMLInputElement>) {
@@ -77,6 +87,29 @@ export function LoopControls({
       return;
     }
 
+    event.currentTarget.setPointerCapture(event.pointerId);
+    setSpeedFromPointer(event);
+  }
+
+  function handleSpeedPointerMove(event: PointerEvent<HTMLInputElement>) {
+    if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
+      return;
+    }
+
+    setSpeedFromPointer(event);
+  }
+
+  function handlePointerEnd(event: PointerEvent<HTMLInputElement>) {
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+      event.currentTarget.releasePointerCapture(event.pointerId);
+    }
+  }
+
+  function seekLoopFromPointer(event: PointerEvent<HTMLInputElement>) {
+    onRangeSeek(getPointerPercent(event));
+  }
+
+  function setSpeedFromPointer(event: PointerEvent<HTMLInputElement>) {
     const nextIndex = Math.round(
       (getPointerPercent(event) / 100) * (FINE_SPEED_OPTIONS.length - 1),
     );
@@ -145,6 +178,9 @@ export function LoopControls({
         value={boundedProgress}
         style={{ '--progress': `${boundedProgress}%` } as CSSProperties}
         onPointerDown={handleLoopPointerDown}
+        onPointerMove={handleLoopPointerMove}
+        onPointerUp={handlePointerEnd}
+        onPointerCancel={handlePointerEnd}
         onChange={(event) => onRangeSeek(Number(event.target.value))}
         disabled={disabled || !activeRange || !validation.ok}
         aria-label="Seek within loop range"
@@ -152,8 +188,8 @@ export function LoopControls({
 
       <div className="control-row">
         <button type="button" className="icon-button" onClick={onPlaybackToggle} disabled={disabled}>
-          {isPaused ? <Play size={18} /> : <Pause size={18} />}
-          <span>{isPaused ? 'Resume' : 'Pause'}</span>
+          {playerStatus === 'playing' ? <Pause size={18} /> : <Play size={18} />}
+          <span>{playbackLabel}</span>
         </button>
         <button type="button" className="secondary icon-button" onClick={onToggleLoop} disabled={!canLoop}>
           <Play size={18} />
@@ -175,6 +211,9 @@ export function LoopControls({
           value={activeSpeedIndex}
           style={{ '--speed-progress': `${speedProgress}%` } as CSSProperties}
           onPointerDown={handleSpeedPointerDown}
+          onPointerMove={handleSpeedPointerMove}
+          onPointerUp={handlePointerEnd}
+          onPointerCancel={handlePointerEnd}
           onChange={(event) =>
             onPlaybackRateChange(FINE_SPEED_OPTIONS[Number(event.target.value)])
           }

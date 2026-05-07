@@ -15,6 +15,9 @@ type UseYouTubePlayerOptions = {
   isLooping: boolean;
 };
 
+const SEEK_SETTLE_TOLERANCE_SECONDS = 0.35;
+const SEEK_SETTLE_TIMEOUT_MS = 6000;
+
 export function useYouTubePlayer({
   videoId,
   loopRange,
@@ -24,6 +27,7 @@ export function useYouTubePlayer({
   const playerRef = useRef<YouTubePlayer | null>(null);
   const rangeRef = useRef(loopRange);
   const loopingRef = useRef(isLooping);
+  const pendingSeekRef = useRef<{ target: number; requestedAt: number } | null>(null);
   const [status, setStatus] = useState<PlayerStatus>('idle');
   const [duration, setDuration] = useState<number | undefined>();
   const [currentTime, setCurrentTime] = useState(0);
@@ -44,6 +48,7 @@ export function useYouTubePlayer({
       setPlaybackRateState(1);
       setAvailablePlaybackRates([1]);
       setError(null);
+      pendingSeekRef.current = null;
       return;
     }
 
@@ -54,6 +59,7 @@ export function useYouTubePlayer({
     setCurrentTime(0);
     setPlaybackRateState(1);
     setAvailablePlaybackRates([1]);
+    pendingSeekRef.current = null;
 
     let createdPlayer: YouTubePlayer | null = null;
 
@@ -102,8 +108,11 @@ export function useYouTubePlayer({
 
               if (event.data === window.YT.PlayerState.ENDED && loopingRef.current) {
                 const range = rangeRef.current;
-                event.target.seekTo(range?.start ?? 0, true);
+                const target = range?.start ?? 0;
+                pendingSeekRef.current = { target, requestedAt: performance.now() };
+                event.target.seekTo(target, true);
                 event.target.playVideo();
+                setCurrentTime(target);
               }
             },
             onPlaybackRateChange: (event: PlaybackRateChangeEvent) => {
@@ -141,7 +150,6 @@ export function useYouTubePlayer({
       }
 
       const nextTime = player.getCurrentTime();
-      setCurrentTime(nextTime);
 
       const nextDuration = player.getDuration();
       if (nextDuration) {
@@ -149,6 +157,22 @@ export function useYouTubePlayer({
       }
 
       setPlaybackRateState(player.getPlaybackRate());
+
+      const pendingSeek = pendingSeekRef.current;
+      if (pendingSeek) {
+        const seekAge = performance.now() - pendingSeek.requestedAt;
+        const seekSettled =
+          Math.abs(nextTime - pendingSeek.target) <= SEEK_SETTLE_TOLERANCE_SECONDS;
+
+        if (!seekSettled && seekAge < SEEK_SETTLE_TIMEOUT_MS) {
+          setCurrentTime(pendingSeek.target);
+          return;
+        }
+
+        pendingSeekRef.current = null;
+      }
+
+      setCurrentTime(nextTime);
 
       const range = rangeRef.current;
       if (!loopingRef.current || !range) {
@@ -158,6 +182,7 @@ export function useYouTubePlayer({
       const wasPlaying = player.getPlayerState() === window.YT?.PlayerState.PLAYING;
 
       if (nextTime < range.start - 0.08) {
+        pendingSeekRef.current = { target: range.start, requestedAt: performance.now() };
         player.seekTo(range.start, true);
         if (wasPlaying) {
           player.playVideo();
@@ -167,6 +192,7 @@ export function useYouTubePlayer({
       }
 
       if (nextTime >= range.end - 0.08) {
+        pendingSeekRef.current = { target: range.start, requestedAt: performance.now() };
         player.seekTo(range.start, true);
         if (wasPlaying) {
           player.playVideo();
@@ -187,8 +213,10 @@ export function useYouTubePlayer({
     }
 
     rangeRef.current = range;
+    pendingSeekRef.current = { target: range.start, requestedAt: performance.now() };
     player.seekTo(range.start, true);
     player.playVideo();
+    setCurrentTime(range.start);
     setStatus('playing');
   }, []);
 
@@ -213,7 +241,14 @@ export function useYouTubePlayer({
   }, []);
 
   const seekTo = useCallback((seconds: number) => {
-    playerRef.current?.seekTo(seconds, true);
+    const player = playerRef.current;
+    if (!player) {
+      return;
+    }
+
+    pendingSeekRef.current = { target: seconds, requestedAt: performance.now() };
+    player.seekTo(seconds, true);
+    setCurrentTime(seconds);
   }, []);
 
   const setPlaybackRate = useCallback((rate: number) => {
