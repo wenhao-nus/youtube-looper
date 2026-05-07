@@ -59,6 +59,10 @@ export function LoopControls({
       ? ((currentTime - activeRange.start) / (activeRange.end - activeRange.start)) * 100
       : 0;
   const boundedProgress = Math.min(100, Math.max(0, progress));
+  const speedProgress =
+    FINE_SPEED_OPTIONS.length > 1
+      ? (activeSpeedIndex / (FINE_SPEED_OPTIONS.length - 1)) * 100
+      : 0;
 
   return (
     <section className="panel controls" aria-labelledby="loop-controls-title">
@@ -148,6 +152,7 @@ export function LoopControls({
           max={FINE_SPEED_OPTIONS.length - 1}
           step="1"
           value={activeSpeedIndex}
+          style={{ '--speed-progress': `${speedProgress}%` } as CSSProperties}
           onChange={(event) =>
             onPlaybackRateChange(FINE_SPEED_OPTIONS[Number(event.target.value)])
           }
