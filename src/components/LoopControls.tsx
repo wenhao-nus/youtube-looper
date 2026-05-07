@@ -224,15 +224,20 @@ export function LoopControls({
           className="speed-slider"
           type="range"
           min="0"
-          max={FINE_SPEED_OPTIONS.length - 1}
-          step="1"
-          value={activeSpeedIndex}
+          max="100"
+          step="0.1"
+          value={speedProgress}
           style={{ '--speed-progress': `${speedProgress}%` } as CSSProperties}
           onPointerDown={handleSpeedPointerDown}
           onPointerMove={handleSpeedPointerMove}
           onPointerUp={handlePointerEnd}
           onPointerCancel={handlePointerEnd}
-          onChange={(event) => onPlaybackRateChange(FINE_SPEED_OPTIONS[Number(event.target.value)])}
+          onChange={(event) => {
+            const percent = Number(event.target.value);
+            const nextIndex = Math.round((percent / 100) * (FINE_SPEED_OPTIONS.length - 1));
+            const boundedIndex = Math.min(FINE_SPEED_OPTIONS.length - 1, Math.max(0, nextIndex));
+            onPlaybackRateChange(FINE_SPEED_OPTIONS[boundedIndex]);
+          }}
           disabled={disabled}
           aria-label="Playback speed"
         />
