@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import type { CSSProperties, PointerEvent } from 'react';
 import { Pause, Play } from 'lucide-react';
 import { formatTime } from '../utils/time';
 import type { LoopRange, RangeValidationResult } from '../utils/validation';
@@ -64,6 +64,26 @@ export function LoopControls({
       ? (activeSpeedIndex / (FINE_SPEED_OPTIONS.length - 1)) * 100
       : 0;
 
+  function handleLoopPointerDown(event: PointerEvent<HTMLInputElement>) {
+    if (disabled || !activeRange || !validation.ok) {
+      return;
+    }
+
+    onRangeSeek(getPointerPercent(event));
+  }
+
+  function handleSpeedPointerDown(event: PointerEvent<HTMLInputElement>) {
+    if (disabled) {
+      return;
+    }
+
+    const nextIndex = Math.round(
+      (getPointerPercent(event) / 100) * (FINE_SPEED_OPTIONS.length - 1),
+    );
+    const boundedIndex = Math.min(FINE_SPEED_OPTIONS.length - 1, Math.max(0, nextIndex));
+    onPlaybackRateChange(FINE_SPEED_OPTIONS[boundedIndex]);
+  }
+
   return (
     <section className="panel controls" aria-labelledby="loop-controls-title">
       <h2 className="visually-hidden" id="loop-controls-title">
@@ -124,6 +144,7 @@ export function LoopControls({
         step="0.1"
         value={boundedProgress}
         style={{ '--progress': `${boundedProgress}%` } as CSSProperties}
+        onPointerDown={handleLoopPointerDown}
         onChange={(event) => onRangeSeek(Number(event.target.value))}
         disabled={disabled || !activeRange || !validation.ok}
         aria-label="Seek within loop range"
@@ -153,6 +174,7 @@ export function LoopControls({
           step="1"
           value={activeSpeedIndex}
           style={{ '--speed-progress': `${speedProgress}%` } as CSSProperties}
+          onPointerDown={handleSpeedPointerDown}
           onChange={(event) =>
             onPlaybackRateChange(FINE_SPEED_OPTIONS[Number(event.target.value)])
           }
@@ -175,6 +197,13 @@ export function LoopControls({
       </div>
     </section>
   );
+}
+
+function getPointerPercent(event: PointerEvent<HTMLInputElement>): number {
+  const rect = event.currentTarget.getBoundingClientRect();
+  const rawPercent = ((event.clientX - rect.left) / rect.width) * 100;
+
+  return Math.min(100, Math.max(0, rawPercent));
 }
 
 function findClosestSpeedIndex(rate: number): number {
