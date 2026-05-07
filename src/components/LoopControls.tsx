@@ -74,6 +74,7 @@ export function LoopControls({
     FINE_SPEED_OPTIONS.length > 1
       ? (activeSpeedIndex / (FINE_SPEED_OPTIONS.length - 1)) * 100
       : 0;
+  const currentTimeLabel = formatTime(currentTime);
   const summaryEndTime = validation.ok ? validation.range.end : duration;
 
   const seekLoopFromPercent = useCallback(
@@ -180,7 +181,7 @@ export function LoopControls({
           Start
           <input
             inputMode="text"
-            placeholder="0:30"
+            placeholder="0:00"
             value={startInput}
             onChange={(event) => onStartChange(event.target.value)}
             disabled={disabled}
@@ -190,7 +191,7 @@ export function LoopControls({
           End
           <input
             inputMode="text"
-            placeholder="1:10"
+            placeholder="0:00"
             value={endInput}
             onChange={(event) => onEndChange(event.target.value)}
             disabled={disabled}
@@ -211,8 +212,8 @@ export function LoopControls({
         <p className="field-message error">{validation.error}</p>
       ) : (
         <p className="time-summary" aria-live="polite">
-          <strong>{formatTime(currentTime)}</strong>/
-          {summaryEndTime ? formatTime(summaryEndTime) : '--:--'}
+          <strong>{currentTimeLabel}</strong>/
+          {summaryEndTime ? formatTime(summaryEndTime) : '0:00'}
         </p>
       )}
 

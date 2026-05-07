@@ -9,7 +9,7 @@ import { useYouTubePlayer } from './hooks/useYouTubePlayer';
 export function App() {
   const [videoId, setVideoId] = useState<string | null>(null);
   const [startInput, setStartInput] = useState('0:00');
-  const [endInput, setEndInput] = useState('0:30');
+  const [endInput, setEndInput] = useState('0:00');
   const [activeRange, setActiveRange] = useState<LoopRange | null>(null);
   const [isLooping, setIsLooping] = useState(false);
   const [shouldAutoStartRange, setShouldAutoStartRange] = useState(false);
@@ -68,11 +68,12 @@ export function App() {
 
   function handleLoad(nextVideoId: string) {
     setVideoId(nextVideoId);
+    setActiveRange(null);
     setIsLooping(false);
     setShouldAutoStartRange(false);
     setShouldUseFullVideoRange(true);
     setStartInput('0:00');
-    setEndInput('');
+    setEndInput('0:00');
   }
 
   function handleToggleLoop() {
@@ -133,7 +134,7 @@ export function App() {
     <main className="app-shell">
       <header className="app-header">
         <div>
-          <h1>YouTube Timestamp Looper</h1>
+          <h1>YouTube Looper</h1>
         </div>
       </header>
 

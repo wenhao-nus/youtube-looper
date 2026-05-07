@@ -1,4 +1,4 @@
-# YouTube Timestamp Looper
+# YouTube Looper
 
 A browser-only React + Vite app for looping an exact section of a YouTube video.
 
