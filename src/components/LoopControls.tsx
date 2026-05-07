@@ -1,4 +1,4 @@
-import type { CSSProperties, PointerEvent } from 'react';
+import { useRef, type CSSProperties, type PointerEvent } from 'react';
 import { Pause, Play } from 'lucide-react';
 import { formatTime } from '../utils/time';
 import type { LoopRange, RangeValidationResult } from '../utils/validation';
@@ -9,6 +9,7 @@ const FINE_SPEED_OPTIONS = Array.from({ length: 36 }, (_, index) =>
   Number((0.25 + index * 0.05).toFixed(2)),
 );
 const SPEED_PRESETS = [0.25, 0.5, 0.75, 1];
+const SPEED_SWITCH_MARGIN = 0.1;
 
 type LoopControlsProps = {
   startInput: string;
@@ -49,6 +50,8 @@ export function LoopControls({
   onRangeSeek,
   onPlaybackRateChange,
 }: LoopControlsProps) {
+  const draggedSpeedIndexRef = useRef<number | null>(null);
+  const isSpeedDraggingRef = useRef(false);
   const canLoop = !disabled && validation.ok;
   const showValidationError = !disabled && !validation.ok;
   const playbackLabel =
@@ -64,6 +67,7 @@ export function LoopControls({
     FINE_SPEED_OPTIONS.length > 1
       ? (activeSpeedIndex / (FINE_SPEED_OPTIONS.length - 1)) * 100
       : 0;
+  const summaryEndTime = validation.ok ? validation.range.end : duration;
 
   function handleLoopPointerDown(event: PointerEvent<HTMLInputElement>) {
     if (disabled || !activeRange || !validation.ok) {
@@ -87,8 +91,10 @@ export function LoopControls({
       return;
     }
 
+    isSpeedDraggingRef.current = true;
+    draggedSpeedIndexRef.current = activeSpeedIndex;
     event.currentTarget.setPointerCapture(event.pointerId);
-    setSpeedFromPointer(event);
+    setSpeedFromPointer(event, true);
   }
 
   function handleSpeedPointerMove(event: PointerEvent<HTMLInputElement>) {
@@ -100,6 +106,8 @@ export function LoopControls({
   }
 
   function handlePointerEnd(event: PointerEvent<HTMLInputElement>) {
+    isSpeedDraggingRef.current = false;
+    draggedSpeedIndexRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
     }
@@ -109,11 +117,21 @@ export function LoopControls({
     onRangeSeek(getPointerPercent(event));
   }
 
-  function setSpeedFromPointer(event: PointerEvent<HTMLInputElement>) {
-    const nextIndex = Math.round(
-      (getPointerPercent(event) / 100) * (FINE_SPEED_OPTIONS.length - 1),
-    );
+  function setSpeedFromPointer(
+    event: PointerEvent<HTMLInputElement>,
+    forceNearest = false,
+  ) {
+    const rawIndex = getPointerIndex(event, FINE_SPEED_OPTIONS.length);
+    const currentIndex = draggedSpeedIndexRef.current ?? activeSpeedIndex;
+    const nextIndex = forceNearest
+      ? Math.round(rawIndex)
+      : getStableSpeedIndex(rawIndex, currentIndex);
     const boundedIndex = Math.min(FINE_SPEED_OPTIONS.length - 1, Math.max(0, nextIndex));
+    if (boundedIndex === currentIndex) {
+      return;
+    }
+
+    draggedSpeedIndexRef.current = boundedIndex;
     onPlaybackRateChange(FINE_SPEED_OPTIONS[boundedIndex]);
   }
 
@@ -165,7 +183,8 @@ export function LoopControls({
         <p className="field-message error">{validation.error}</p>
       ) : (
         <p className="time-summary" aria-live="polite">
-          <strong>{formatTime(currentTime)}</strong>/{duration ? formatTime(duration) : '--:--'}
+          <strong>{formatTime(currentTime)}</strong>/
+          {summaryEndTime ? formatTime(summaryEndTime) : '--:--'}
         </p>
       )}
 
@@ -214,9 +233,13 @@ export function LoopControls({
           onPointerMove={handleSpeedPointerMove}
           onPointerUp={handlePointerEnd}
           onPointerCancel={handlePointerEnd}
-          onChange={(event) =>
-            onPlaybackRateChange(FINE_SPEED_OPTIONS[Number(event.target.value)])
-          }
+          onChange={(event) => {
+            if (isSpeedDraggingRef.current) {
+              return;
+            }
+
+            onPlaybackRateChange(FINE_SPEED_OPTIONS[Number(event.target.value)]);
+          }}
           disabled={disabled}
           aria-label="Playback speed"
         />
@@ -243,6 +266,29 @@ function getPointerPercent(event: PointerEvent<HTMLInputElement>): number {
   const rawPercent = ((event.clientX - rect.left) / rect.width) * 100;
 
   return Math.min(100, Math.max(0, rawPercent));
+}
+
+function getPointerIndex(event: PointerEvent<HTMLInputElement>, optionCount: number): number {
+  if (optionCount <= 1) {
+    return 0;
+  }
+
+  return (getPointerPercent(event) / 100) * (optionCount - 1);
+}
+
+function getStableSpeedIndex(rawIndex: number, currentIndex: number): number {
+  const roundedIndex = Math.round(rawIndex);
+  if (roundedIndex === currentIndex) {
+    return currentIndex;
+  }
+
+  const movingForward = roundedIndex > currentIndex;
+  const switchThreshold = movingForward
+    ? currentIndex + 0.5 + SPEED_SWITCH_MARGIN
+    : currentIndex - 0.5 - SPEED_SWITCH_MARGIN;
+  const canSwitch = movingForward ? rawIndex >= switchThreshold : rawIndex <= switchThreshold;
+
+  return canSwitch ? roundedIndex : currentIndex;
 }
 
 function findClosestSpeedIndex(rate: number): number {
