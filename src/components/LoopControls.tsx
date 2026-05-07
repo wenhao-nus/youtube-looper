@@ -52,6 +52,7 @@ export function LoopControls({
 }: LoopControlsProps) {
   const draggedSpeedIndexRef = useRef<number | null>(null);
   const isSpeedDraggingRef = useRef(false);
+  const speedPointerTypeRef = useRef<string | null>(null);
   const canLoop = !disabled && validation.ok;
   const showValidationError = !disabled && !validation.ok;
   const playbackLabel =
@@ -92,6 +93,7 @@ export function LoopControls({
     }
 
     isSpeedDraggingRef.current = true;
+    speedPointerTypeRef.current = event.pointerType;
     draggedSpeedIndexRef.current = activeSpeedIndex;
     event.currentTarget.setPointerCapture(event.pointerId);
     setSpeedFromPointer(event, true);
@@ -107,6 +109,7 @@ export function LoopControls({
 
   function handlePointerEnd(event: PointerEvent<HTMLInputElement>) {
     isSpeedDraggingRef.current = false;
+    speedPointerTypeRef.current = null;
     draggedSpeedIndexRef.current = null;
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
       event.currentTarget.releasePointerCapture(event.pointerId);
@@ -234,11 +237,13 @@ export function LoopControls({
           onPointerUp={handlePointerEnd}
           onPointerCancel={handlePointerEnd}
           onChange={(event) => {
-            if (isSpeedDraggingRef.current) {
+            const nextIndex = Number(event.target.value);
+            draggedSpeedIndexRef.current = nextIndex;
+            if (isSpeedDraggingRef.current && speedPointerTypeRef.current === 'touch') {
               return;
             }
 
-            onPlaybackRateChange(FINE_SPEED_OPTIONS[Number(event.target.value)]);
+            onPlaybackRateChange(FINE_SPEED_OPTIONS[nextIndex]);
           }}
           disabled={disabled}
           aria-label="Playback speed"
