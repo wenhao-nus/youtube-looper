@@ -75,6 +75,10 @@ export function LoopControls({
       return;
     }
 
+    if (event.pointerType === 'touch') {
+      event.preventDefault();
+    }
+
     event.currentTarget.setPointerCapture(event.pointerId);
     seekLoopFromPointer(event);
   }
@@ -84,12 +88,20 @@ export function LoopControls({
       return;
     }
 
+    if (event.pointerType === 'touch') {
+      event.preventDefault();
+    }
+
     seekLoopFromPointer(event);
   }
 
   function handleSpeedPointerDown(event: PointerEvent<HTMLInputElement>) {
     if (disabled) {
       return;
+    }
+
+    if (event.pointerType === 'touch') {
+      event.preventDefault();
     }
 
     isSpeedDraggingRef.current = true;
@@ -102,6 +114,10 @@ export function LoopControls({
   function handleSpeedPointerMove(event: PointerEvent<HTMLInputElement>) {
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
       return;
+    }
+
+    if (event.pointerType === 'touch') {
+      event.preventDefault();
     }
 
     setSpeedFromPointer(event);
