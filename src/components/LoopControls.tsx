@@ -1,4 +1,4 @@
-import type { CSSProperties, PointerEvent } from 'react';
+import type { CSSProperties, PointerEvent, TouchEvent } from 'react';
 import { Pause, Play } from 'lucide-react';
 import { formatTime } from '../utils/time';
 import type { LoopRange, RangeValidationResult } from '../utils/validation';
@@ -122,6 +122,15 @@ export function LoopControls({
     }
   }
 
+  function handleSpeedTouchCapture(event: TouchEvent<HTMLInputElement>) {
+    if (disabled) {
+      return;
+    }
+
+    event.preventDefault();
+    event.stopPropagation();
+  }
+
   function seekLoopFromPointer(event: PointerEvent<HTMLInputElement>) {
     onRangeSeek(getPointerPercent(event));
   }
@@ -232,6 +241,8 @@ export function LoopControls({
           onPointerMove={handleSpeedPointerMove}
           onPointerUp={handlePointerEnd}
           onPointerCancel={handlePointerEnd}
+          onTouchStartCapture={handleSpeedTouchCapture}
+          onTouchMoveCapture={handleSpeedTouchCapture}
           onChange={(event) => onPlaybackRateChange(FINE_SPEED_OPTIONS[Number(event.target.value)])}
           disabled={disabled}
           aria-label="Playback speed"
