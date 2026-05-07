@@ -1,4 +1,4 @@
-import { useRef, type CSSProperties, type PointerEvent, type TouchEvent } from 'react';
+import { useRef, type CSSProperties, type PointerEvent } from 'react';
 import { Pause, Play } from 'lucide-react';
 import { formatTime } from '../utils/time';
 import type { LoopRange, RangeValidationResult } from '../utils/validation';
@@ -121,43 +121,6 @@ export function LoopControls({
     }
 
     setSpeedFromPointer(event);
-  }
-
-  function handleSpeedTouchStart(event: TouchEvent<HTMLInputElement>) {
-    if (disabled) {
-      return;
-    }
-
-    const touch = event.touches[0];
-    if (!touch) {
-      return;
-    }
-
-    event.preventDefault();
-    isSpeedDraggingRef.current = true;
-    speedPointerTypeRef.current = 'touch';
-    draggedSpeedIndexRef.current = activeSpeedIndex;
-    setSpeedFromClientX(event.currentTarget, touch.clientX, true);
-  }
-
-  function handleSpeedTouchMove(event: TouchEvent<HTMLInputElement>) {
-    if (!isSpeedDraggingRef.current) {
-      return;
-    }
-
-    const touch = event.touches[0];
-    if (!touch) {
-      return;
-    }
-
-    event.preventDefault();
-    setSpeedFromClientX(event.currentTarget, touch.clientX);
-  }
-
-  function handleSpeedTouchEnd() {
-    isSpeedDraggingRef.current = false;
-    speedPointerTypeRef.current = null;
-    draggedSpeedIndexRef.current = null;
   }
 
   function handlePointerEnd(event: PointerEvent<HTMLInputElement>) {
@@ -297,10 +260,6 @@ export function LoopControls({
           onPointerMove={handleSpeedPointerMove}
           onPointerUp={handlePointerEnd}
           onPointerCancel={handlePointerEnd}
-          onTouchStart={handleSpeedTouchStart}
-          onTouchMove={handleSpeedTouchMove}
-          onTouchEnd={handleSpeedTouchEnd}
-          onTouchCancel={handleSpeedTouchEnd}
           onChange={(event) => {
             const nextIndex = Number(event.target.value);
             draggedSpeedIndexRef.current = nextIndex;
