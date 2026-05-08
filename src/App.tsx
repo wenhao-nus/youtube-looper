@@ -1,10 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
+import { DetectedSections } from './components/DetectedSections';
 import { LoopControls } from './components/LoopControls';
 import { PlayerPanel } from './components/PlayerPanel';
 import { UrlForm } from './components/UrlForm';
 import { formatEditableTime, formatTime } from './utils/time';
 import { validateLoopRange, type LoopRange } from './utils/validation';
 import { useYouTubePlayer } from './hooks/useYouTubePlayer';
+import {
+  detectSongSections,
+  type DetectedSongSection,
+  type SectionDetectionStatus,
+} from './lib/songSections';
 
 export function App() {
   const [videoId, setVideoId] = useState<string | null>(null);
@@ -14,6 +20,10 @@ export function App() {
   const [isLooping, setIsLooping] = useState(false);
   const [shouldAutoStartRange, setShouldAutoStartRange] = useState(false);
   const [shouldUseFullVideoRange, setShouldUseFullVideoRange] = useState(false);
+  const [sectionDetectionStatus, setSectionDetectionStatus] =
+    useState<SectionDetectionStatus>('idle');
+  const [detectedSections, setDetectedSections] = useState<DetectedSongSection[]>([]);
+  const [sectionDetectionMessage, setSectionDetectionMessage] = useState<string | null>(null);
 
   const {
     containerId,
@@ -37,6 +47,19 @@ export function App() {
     () => validateLoopRange(startInput, endInput, duration),
     [duration, endInput, startInput],
   );
+  const selectedSectionId = useMemo(() => {
+    if (!validation.ok) {
+      return null;
+    }
+
+    const selectedSection = detectedSections.find(
+      (section) =>
+        areTimesEqual(section.start, validation.range.start) &&
+        areTimesEqual(section.end, validation.range.end),
+    );
+
+    return selectedSection?.id ?? null;
+  }, [detectedSections, validation]);
 
   useEffect(() => {
     if (validation.ok) {
@@ -72,6 +95,9 @@ export function App() {
     setIsLooping(false);
     setShouldAutoStartRange(false);
     setShouldUseFullVideoRange(true);
+    setSectionDetectionStatus('idle');
+    setDetectedSections([]);
+    setSectionDetectionMessage(null);
     setStartInput('0:00');
     setEndInput('0:00');
   }
@@ -130,6 +156,62 @@ export function App() {
     seekTo(nextTime);
   }
 
+  function handleSelectSection(section: DetectedSongSection) {
+    const nextStart = formatEditableTime(section.start);
+    const nextEnd = formatEditableTime(section.end);
+    const nextValidation = validateLoopRange(nextStart, nextEnd, duration);
+
+    if (!nextValidation.ok) {
+      setSectionDetectionStatus('error');
+      setSectionDetectionMessage(nextValidation.error);
+      return;
+    }
+
+    setShouldAutoStartRange(false);
+    setShouldUseFullVideoRange(false);
+    setStartInput(nextStart);
+    setEndInput(nextEnd);
+    setActiveRange(nextValidation.range);
+    setIsLooping(true);
+    playLoop(nextValidation.range);
+  }
+
+  async function handleDetectSections() {
+    if (!videoId || !duration) {
+      return;
+    }
+
+    const requestVideoId = videoId;
+    setSectionDetectionStatus('loading');
+    setSectionDetectionMessage(null);
+
+    try {
+      const result = await detectSongSections({
+        videoId: requestVideoId,
+        videoUrl: getWatchUrl(requestVideoId),
+        videoDuration: duration,
+      });
+
+      if (requestVideoId !== videoId) {
+        return;
+      }
+
+      setDetectedSections(result.sections);
+      setSectionDetectionStatus(result.status);
+      setSectionDetectionMessage(result.message ?? null);
+    } catch (error) {
+      if (requestVideoId !== videoId) {
+        return;
+      }
+
+      setDetectedSections([]);
+      setSectionDetectionStatus('error');
+      setSectionDetectionMessage(
+        error instanceof Error ? error.message : 'Section detection failed.',
+      );
+    }
+  }
+
   return (
     <main className="app-shell">
       <header className="app-header">
@@ -170,8 +252,25 @@ export function App() {
             onRangeSeek={handleRangeSeek}
             onPlaybackRateChange={setPlaybackRate}
           />
+          <DetectedSections
+            status={sectionDetectionStatus}
+            sections={detectedSections}
+            selectedSectionId={selectedSectionId}
+            message={sectionDetectionMessage}
+            disabled={!videoId || !duration || status === 'loading' || status === 'error'}
+            onDetect={handleDetectSections}
+            onSelectSection={handleSelectSection}
+          />
         </aside>
       </div>
     </main>
   );
+}
+
+function getWatchUrl(videoId: string): string {
+  return `https://www.youtube.com/watch?v=${videoId}`;
+}
+
+function areTimesEqual(first: number, second: number): boolean {
+  return Math.abs(first - second) < 0.01;
 }
