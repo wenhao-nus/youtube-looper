@@ -30,6 +30,7 @@ export function useYouTubePlayer({
   const pendingSeekRef = useRef<{ target: number; requestedAt: number } | null>(null);
   const [status, setStatus] = useState<PlayerStatus>('idle');
   const [duration, setDuration] = useState<number | undefined>();
+  const [loadedVideoId, setLoadedVideoId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(0);
   const [playbackRate, setPlaybackRateState] = useState(1);
   const [availablePlaybackRates, setAvailablePlaybackRates] = useState<number[]>([1]);
@@ -44,6 +45,7 @@ export function useYouTubePlayer({
     if (!videoId) {
       setStatus('idle');
       setDuration(undefined);
+      setLoadedVideoId(null);
       setCurrentTime(0);
       setPlaybackRateState(1);
       setAvailablePlaybackRates([1]);
@@ -56,6 +58,7 @@ export function useYouTubePlayer({
     setStatus('loading');
     setError(null);
     setDuration(undefined);
+    setLoadedVideoId(null);
     setCurrentTime(0);
     setPlaybackRateState(1);
     setAvailablePlaybackRates([1]);
@@ -89,6 +92,7 @@ export function useYouTubePlayer({
                 .getAvailablePlaybackRates()
                 .filter((rate) => rate >= 0.25 && rate <= 2);
               setDuration(loadedDuration || undefined);
+              setLoadedVideoId(videoId);
               setAvailablePlaybackRates(loadedRates.length ? loadedRates : [1]);
               setPlaybackRateState(event.target.getPlaybackRate());
               setStatus('ready');
@@ -268,6 +272,7 @@ export function useYouTubePlayer({
     status,
     error,
     duration,
+    loadedVideoId,
     currentTime,
     playbackRate,
     availablePlaybackRates,

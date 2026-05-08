@@ -34,6 +34,7 @@ export function App() {
     status,
     error,
     duration,
+    loadedVideoId,
     currentTime,
     playbackRate,
     playLoop,
@@ -86,14 +87,14 @@ export function App() {
   }, [playLoop, shouldAutoStartRange, status, validation, videoId]);
 
   useEffect(() => {
-    if (!shouldUseFullVideoRange || !duration) {
+    if (!shouldUseFullVideoRange || !duration || loadedVideoId !== videoId) {
       return;
     }
 
     setStartInput('0:00');
     setEndInput(formatEditableTime(duration));
     setShouldUseFullVideoRange(false);
-  }, [duration, shouldUseFullVideoRange]);
+  }, [duration, loadedVideoId, shouldUseFullVideoRange, videoId]);
 
   useEffect(() => {
     if (!videoId || !duration) {
