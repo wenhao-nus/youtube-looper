@@ -1,5 +1,5 @@
 import { GoogleGenAI, MediaResolution } from '@google/genai';
-import { extractSectionsFromGeminiText, type SongSection } from './sectionDetection';
+import { extractSectionsFromGeminiText, type SongSection } from './sectionDetection.js';
 
 export type GeminiSectionResult =
   | {
