@@ -33,6 +33,16 @@ export default async function handler(
     return;
   }
 
-  const result = await handleSongSectionsRequest(request.body);
-  response.status(result.statusCode).json(result.body);
+  try {
+    const result = await handleSongSectionsRequest(request.body);
+    response.status(result.statusCode).json(result.body);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'Section detection failed.';
+    response.status(500).json({
+      status: 'error',
+      source: 'gemini',
+      sections: [],
+      message,
+    });
+  }
 }
