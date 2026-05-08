@@ -1,7 +1,7 @@
 import cors from 'cors';
 import dotenv from 'dotenv';
 import express from 'express';
-import { handleSongSectionsRequest } from './songSections';
+import { handleSongSectionsRequest } from './songSections.js';
 
 dotenv.config();
 

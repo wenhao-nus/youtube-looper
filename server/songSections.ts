@@ -1,7 +1,7 @@
 import { z } from 'zod';
-import { getCachedValue, setCachedValue } from './cache';
-import { detectSectionsWithGemini } from './gemini';
-import type { SongSection } from './sectionDetection';
+import { getCachedValue, setCachedValue } from './cache.js';
+import { detectSectionsWithGemini } from './gemini.js';
+import type { SongSection } from './sectionDetection.js';
 
 const geminiModels = getGeminiModels();
 const geminiTimeoutMs = getGeminiTimeoutMs();

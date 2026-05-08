@@ -1,5 +1,3 @@
-import { handleSongSectionsRequest } from '../server/songSections';
-
 type VercelRequestLike = {
   method?: string;
   body?: unknown;
@@ -34,6 +32,7 @@ export default async function handler(
   }
 
   try {
+    const { handleSongSectionsRequest } = await import('../server/songSections.js');
     const result = await handleSongSectionsRequest(request.body);
     response.status(result.statusCode).json(result.body);
   } catch (error) {

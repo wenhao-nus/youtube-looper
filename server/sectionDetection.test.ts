@@ -4,7 +4,7 @@ import {
   extractSectionsFromGeminiText,
   normalizeSections,
   parseTimestamp,
-} from './sectionDetection';
+} from './sectionDetection.js';
 
 test('parseTimestamp supports seconds and clock formats', () => {
   assert.equal(parseTimestamp(33), 33);
