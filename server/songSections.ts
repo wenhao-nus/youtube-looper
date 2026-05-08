@@ -9,6 +9,8 @@ const sectionCacheTtlSeconds = getSectionCacheTtlSeconds();
 const detectionCooldownMs = getDetectionCooldownMs();
 const inFlightRequests = new Map<string, Promise<SongSectionsResponse>>();
 const recentRequests = new Map<string, number>();
+const MAX_SECTION_DETECTION_SECONDS = 10 * 60;
+const VIDEO_TOO_LONG_MESSAGE = 'Song section detection only supports videos up to 10 minutes.';
 
 const requestSchema = z.object({
   videoId: z.string().regex(/^[a-zA-Z0-9_-]{11}$/),
@@ -21,6 +23,7 @@ export type SongSectionsResponse = {
   source: 'gemini';
   sections: SongSection[];
   model?: string;
+  attemptedModels?: string[];
   message?: string;
 };
 
@@ -47,6 +50,19 @@ export async function handleSongSectionsRequest(
   }
 
   const { videoId, videoUrl, videoDuration } = parsed.data;
+
+  if (videoDuration > MAX_SECTION_DETECTION_SECONDS) {
+    return {
+      statusCode: 400,
+      body: {
+        status: 'error',
+        source: 'gemini',
+        sections: [],
+        message: VIDEO_TOO_LONG_MESSAGE,
+      },
+    };
+  }
+
   const cacheKey = getCacheKey(videoId, videoDuration);
   const cached = await getCachedValue<SongSectionsResponse>(cacheKey);
 
@@ -118,7 +134,7 @@ async function runDetection({
     });
 
     if (!result.ok) {
-      return unavailable(result.message);
+      return unavailable(result.message, result.attemptedModels);
     }
 
     return {
@@ -126,6 +142,7 @@ async function runDetection({
       source: 'gemini',
       sections: result.sections,
       model: result.model,
+      attemptedModels: result.attemptedModels,
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Gemini section detection failed.';
@@ -138,11 +155,12 @@ async function runDetection({
   }
 }
 
-function unavailable(message: string): SongSectionsResponse {
+function unavailable(message: string, attemptedModels?: string[]): SongSectionsResponse {
   return {
     status: 'unavailable',
     source: 'gemini',
     sections: [],
+    attemptedModels,
     message,
   };
 }
@@ -183,14 +201,14 @@ function isYouTubeUrl(value: string): boolean {
 }
 
 function getGeminiModels(): string[] {
-  const configuredModels = [
-    process.env.GEMINI_MODEL,
-    ...(process.env.GEMINI_FALLBACK_MODELS?.split(',') ?? []),
-  ];
-  const defaultFallbacks = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
-  const models = [...configuredModels, ...defaultFallbacks]
-    .map((model) => model?.trim())
-    .filter((model): model is string => Boolean(model));
+  const primaryModel = process.env.GEMINI_MODEL?.trim() || 'gemini-2.5-flash';
+  const configuredFallbacks = process.env.GEMINI_FALLBACK_MODELS?.split(',')
+    .map((model) => model.trim())
+    .filter(Boolean);
+  const fallbackModels = configuredFallbacks?.length
+    ? configuredFallbacks
+    : ['gemini-2.5-flash-lite'];
+  const models = [primaryModel, ...fallbackModels];
 
   return Array.from(new Set(models));
 }

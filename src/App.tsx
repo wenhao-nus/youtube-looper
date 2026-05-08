@@ -7,6 +7,8 @@ import { formatEditableTime, formatTime } from './utils/time';
 import { validateLoopRange, type LoopRange } from './utils/validation';
 import { useYouTubePlayer } from './hooks/useYouTubePlayer';
 import {
+  MAX_SECTION_DETECTION_SECONDS,
+  VIDEO_TOO_LONG_MESSAGE,
   detectSongSections,
   type DetectedSongSection,
   type SectionDetectionStatus,
@@ -47,6 +49,8 @@ export function App() {
     () => validateLoopRange(startInput, endInput, duration),
     [duration, endInput, startInput],
   );
+  const isSectionDetectionTooLong =
+    typeof duration === 'number' && duration > MAX_SECTION_DETECTION_SECONDS;
   const selectedSectionId = useMemo(() => {
     if (!validation.ok) {
       return null;
@@ -88,6 +92,24 @@ export function App() {
     setEndInput(formatEditableTime(duration));
     setShouldUseFullVideoRange(false);
   }, [duration, shouldUseFullVideoRange]);
+
+  useEffect(() => {
+    if (!videoId || !duration) {
+      return;
+    }
+
+    if (!isSectionDetectionTooLong) {
+      if (sectionDetectionMessage === VIDEO_TOO_LONG_MESSAGE) {
+        setSectionDetectionStatus('idle');
+        setSectionDetectionMessage(null);
+      }
+      return;
+    }
+
+    setSectionDetectionStatus('error');
+    setDetectedSections([]);
+    setSectionDetectionMessage(VIDEO_TOO_LONG_MESSAGE);
+  }, [duration, isSectionDetectionTooLong, sectionDetectionMessage, videoId]);
 
   function handleLoad(nextVideoId: string) {
     setVideoId(nextVideoId);
@@ -181,6 +203,13 @@ export function App() {
       return;
     }
 
+    if (isSectionDetectionTooLong) {
+      setSectionDetectionStatus('error');
+      setDetectedSections([]);
+      setSectionDetectionMessage(VIDEO_TOO_LONG_MESSAGE);
+      return;
+    }
+
     const requestVideoId = videoId;
     setSectionDetectionStatus('loading');
     setSectionDetectionMessage(null);
@@ -257,7 +286,13 @@ export function App() {
             sections={detectedSections}
             selectedSectionId={selectedSectionId}
             message={sectionDetectionMessage}
-            disabled={!videoId || !duration || status === 'loading' || status === 'error'}
+            disabled={
+              !videoId ||
+              !duration ||
+              isSectionDetectionTooLong ||
+              status === 'loading' ||
+              status === 'error'
+            }
             onDetect={handleDetectSections}
             onSelectSection={handleSelectSection}
           />
