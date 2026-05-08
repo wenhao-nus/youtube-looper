@@ -21,6 +21,7 @@ const ALLOWED_LABELS = new Set([
   'Intro',
   'Verse',
   'Pre-Chorus',
+  'Post-Chorus',
   'Chorus',
   'Bridge',
   'Instrumental',
@@ -181,7 +182,8 @@ function normalizeLabel(value: unknown): string {
     .replace(/\s+/g, ' ')
     .toLowerCase()
     .replace(/\b\w/g, (letter) => letter.toUpperCase())
-    .replace('Pre Chorus', 'Pre-Chorus');
+    .replace('Pre Chorus', 'Pre-Chorus')
+    .replace('Post Chorus', 'Post-Chorus');
 
   return ALLOWED_LABELS.has(normalized) ? normalized : 'Section';
 }

@@ -51,6 +51,25 @@ test('detectSectionsWithGemini tries fallback model after high demand error', as
   }
 });
 
+test('detectSectionsWithGemini enables Google Search grounding', async () => {
+  let tools: unknown;
+
+  const result = await detectSectionsWithGemini({
+    apiKey: 'test-key',
+    models: ['primary-model'],
+    videoUrl: 'https://www.youtube.com/watch?v=dQw4w9WgXcQ',
+    videoDuration: 30,
+    timeoutMs: 1000,
+    generateContent: async ({ config }) => {
+      tools = config?.tools;
+      return { text: VALID_RESPONSE };
+    },
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(tools, [{ googleSearch: {} }]);
+});
+
 test('detectSectionsWithGemini tries fallback model after timeout-style error', async () => {
   const attemptedModels: string[] = [];
 

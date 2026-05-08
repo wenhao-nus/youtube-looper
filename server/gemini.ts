@@ -41,6 +41,7 @@ const RESPONSE_SCHEMA = {
               'Intro',
               'Verse',
               'Pre-Chorus',
+              'Post-Chorus',
               'Chorus',
               'Bridge',
               'Instrumental',
@@ -101,6 +102,7 @@ export async function detectSectionsWithGemini({
           responseMimeType: 'application/json',
           responseJsonSchema: RESPONSE_SCHEMA,
           temperature: 0,
+          tools: [{ googleSearch: {} }],
           topP: 0.2,
         },
       });
@@ -143,8 +145,9 @@ function buildPrompt(videoDuration: number): string {
 Analyze this YouTube video's audio and return 4-16 major song sections.
 You may return fewer than 4 sections only if you are very confident the song has fewer than 4 distinct major sections.
 Use only timestamps from this exact video. Do not use studio-track assumptions.
-Use the video's audio, transcript, description, and metadata. If useful, compare against the studio-track transcript or known release metadata, but keep the timestamps aligned to this exact video.
-Use labels: Intro, Verse, Pre-Chorus, Chorus, Bridge, Instrumental, Outro, Section.
+Use the video's audio, transcript, description, and metadata. If useful, use web search to compare against reputable sources of lyrics and section structure (such as Genius, Musixmatch), studio-track transcripts, or known release metadata, but keep the timestamps aligned to this exact video.
+Do not output lyrics.
+Use labels: Intro, Verse, Pre-Chorus, Chorus, Post-Chorus, Bridge, Instrumental, Outro, Section.
 Use Section only as a fallback when the section is musically distinct but none of the named labels fit.
 Use MM:SS timestamps, clamp to 0-${Math.round(videoDuration)} seconds, and return JSON only.
 Confidence must describe boundary certainty:
