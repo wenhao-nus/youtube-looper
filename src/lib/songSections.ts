@@ -40,11 +40,28 @@ export async function detectSongSections({
     }),
   });
 
-  const body = (await response.json()) as SongSectionsResponse;
+  const body = await parseSongSectionsResponse(response);
 
   if (!response.ok) {
     throw new Error(body.message ?? 'Section detection failed.');
   }
 
   return body;
+}
+
+async function parseSongSectionsResponse(response: Response): Promise<SongSectionsResponse> {
+  const contentType = response.headers.get('content-type') ?? '';
+
+  if (contentType.includes('application/json')) {
+    return (await response.json()) as SongSectionsResponse;
+  }
+
+  const text = await response.text();
+
+  return {
+    status: 'error',
+    source: 'gemini',
+    sections: [],
+    message: text.trim() || 'Section detection failed.',
+  };
 }

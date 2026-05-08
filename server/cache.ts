@@ -18,7 +18,13 @@ export async function getCachedValue<T>(key: string): Promise<T | null> {
     return memoryValue as T;
   }
 
-  const runtimeValue = await runtimeCache.get(key);
+  let runtimeValue: unknown | null = null;
+
+  try {
+    runtimeValue = await runtimeCache.get(key);
+  } catch (error) {
+    console.warn('Runtime cache read failed:', getErrorMessage(error));
+  }
 
   if (!runtimeValue) {
     return null;
@@ -34,9 +40,18 @@ export async function setCachedValue(
   { name, tags, ttlSeconds }: CacheSetOptions,
 ): Promise<void> {
   memoryCache.set(key, value);
-  await runtimeCache.set(key, value, {
-    name,
-    tags,
-    ttl: ttlSeconds,
-  });
+
+  try {
+    await runtimeCache.set(key, value, {
+      name,
+      tags,
+      ttl: ttlSeconds,
+    });
+  } catch (error) {
+    console.warn('Runtime cache write failed:', getErrorMessage(error));
+  }
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
