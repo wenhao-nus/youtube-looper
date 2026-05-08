@@ -81,7 +81,7 @@ export async function handleSongSectionsRequest(
   if (!apiKey) {
     return {
       statusCode: 200,
-      body: unavailable('Add GEMINI_API_KEY to enable Gemini section detection.'),
+      body: unavailable('AI section detection is not configured.'),
     };
   }
 
@@ -145,12 +145,13 @@ async function runDetection({
       attemptedModels: result.attemptedModels,
     };
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Gemini section detection failed.';
+    console.warn('AI section detection failed:', getErrorMessage(error));
+
     return {
       status: 'error',
       source: 'gemini',
       sections: [],
-      message,
+      message: 'AI section detection failed.',
     };
   }
 }
@@ -245,4 +246,8 @@ function getDetectionCooldownMs(): number {
 
 function getCacheKey(videoId: string, videoDuration: number): string {
   return `${videoId}:${Math.round(videoDuration)}`;
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }

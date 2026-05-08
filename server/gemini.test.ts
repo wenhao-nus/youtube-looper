@@ -148,7 +148,7 @@ test('detectSectionsWithGemini reports all attempted models when all are overloa
   if (!result.ok) {
     assert.equal(
       result.message,
-      'Gemini models are currently experiencing high demand. Please try again later.',
+      'AI models are currently experiencing high demand. Please try again later.',
     );
   }
 });

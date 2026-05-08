@@ -36,12 +36,13 @@ export default async function handler(
     const result = await handleSongSectionsRequest(request.body);
     response.status(result.statusCode).json(result.body);
   } catch (error) {
-    const message = error instanceof Error ? error.message : 'Section detection failed.';
+    console.warn('AI section detection API failed:', error);
+
     response.status(500).json({
       status: 'error',
       source: 'gemini',
       sections: [],
-      message,
+      message: 'AI section detection failed.',
     });
   }
 }

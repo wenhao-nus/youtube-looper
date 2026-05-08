@@ -205,16 +205,16 @@ function getErrorStatus(error: unknown): number | undefined {
 
 function getTransientFailureMessage(error: unknown): string {
   if (!error) {
-    return 'Gemini section detection is temporarily unavailable.';
+    return 'AI section detection is temporarily unavailable.';
   }
 
   const message = getErrorText(error);
 
   if (message.toLowerCase().includes('high demand')) {
-    return 'Gemini models are currently experiencing high demand. Please try again later.';
+    return 'AI models are currently experiencing high demand. Please try again later.';
   }
 
-  return 'Gemini section detection is temporarily unavailable. Please try again later.';
+  return 'AI section detection is temporarily unavailable. Please try again later.';
 }
 
 function getErrorText(error: unknown): string {
