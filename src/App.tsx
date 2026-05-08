@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DetectedSections } from './components/DetectedSections';
 import { LoopControls } from './components/LoopControls';
 import { PlayerPanel } from './components/PlayerPanel';
@@ -26,6 +26,8 @@ export function App() {
     useState<SectionDetectionStatus>('idle');
   const [detectedSections, setDetectedSections] = useState<DetectedSongSection[]>([]);
   const [sectionDetectionMessage, setSectionDetectionMessage] = useState<string | null>(null);
+  const [autoDetectionKey, setAutoDetectionKey] = useState<string | null>(null);
+  const detectionRequestIdRef = useRef(0);
 
   const {
     containerId,
@@ -111,7 +113,77 @@ export function App() {
     setSectionDetectionMessage(VIDEO_TOO_LONG_MESSAGE);
   }, [duration, isSectionDetectionTooLong, sectionDetectionMessage, videoId]);
 
+  const runSectionDetection = useCallback(async (requestVideoId: string, requestDuration: number) => {
+    if (requestDuration > MAX_SECTION_DETECTION_SECONDS) {
+      setSectionDetectionStatus('error');
+      setDetectedSections([]);
+      setSectionDetectionMessage(VIDEO_TOO_LONG_MESSAGE);
+      return;
+    }
+
+    const requestId = detectionRequestIdRef.current + 1;
+    detectionRequestIdRef.current = requestId;
+    setSectionDetectionStatus('loading');
+    setSectionDetectionMessage(null);
+
+    try {
+      const result = await detectSongSections({
+        videoId: requestVideoId,
+        videoUrl: getWatchUrl(requestVideoId),
+        videoDuration: requestDuration,
+      });
+
+      if (detectionRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setDetectedSections(result.sections);
+      setSectionDetectionStatus(result.status);
+      setSectionDetectionMessage(result.message ?? null);
+    } catch (error) {
+      if (detectionRequestIdRef.current !== requestId) {
+        return;
+      }
+
+      setDetectedSections([]);
+      setSectionDetectionStatus('error');
+      setSectionDetectionMessage(
+        error instanceof Error ? error.message : 'Section detection failed.',
+      );
+    }
+  }, []);
+
+  useEffect(() => {
+    if (
+      !videoId ||
+      !duration ||
+      isSectionDetectionTooLong ||
+      sectionDetectionStatus !== 'idle' ||
+      !['ready', 'playing', 'paused'].includes(status)
+    ) {
+      return;
+    }
+
+    const nextAutoDetectionKey = `${videoId}:${Math.round(duration)}`;
+
+    if (autoDetectionKey === nextAutoDetectionKey) {
+      return;
+    }
+
+    setAutoDetectionKey(nextAutoDetectionKey);
+    void runSectionDetection(videoId, duration);
+  }, [
+    autoDetectionKey,
+    duration,
+    isSectionDetectionTooLong,
+    runSectionDetection,
+    sectionDetectionStatus,
+    status,
+    videoId,
+  ]);
+
   function handleLoad(nextVideoId: string) {
+    detectionRequestIdRef.current += 1;
     setVideoId(nextVideoId);
     setActiveRange(null);
     setIsLooping(false);
@@ -120,6 +192,7 @@ export function App() {
     setSectionDetectionStatus('idle');
     setDetectedSections([]);
     setSectionDetectionMessage(null);
+    setAutoDetectionKey(null);
     setStartInput('0:00');
     setEndInput('0:00');
   }
@@ -203,42 +276,7 @@ export function App() {
       return;
     }
 
-    if (isSectionDetectionTooLong) {
-      setSectionDetectionStatus('error');
-      setDetectedSections([]);
-      setSectionDetectionMessage(VIDEO_TOO_LONG_MESSAGE);
-      return;
-    }
-
-    const requestVideoId = videoId;
-    setSectionDetectionStatus('loading');
-    setSectionDetectionMessage(null);
-
-    try {
-      const result = await detectSongSections({
-        videoId: requestVideoId,
-        videoUrl: getWatchUrl(requestVideoId),
-        videoDuration: duration,
-      });
-
-      if (requestVideoId !== videoId) {
-        return;
-      }
-
-      setDetectedSections(result.sections);
-      setSectionDetectionStatus(result.status);
-      setSectionDetectionMessage(result.message ?? null);
-    } catch (error) {
-      if (requestVideoId !== videoId) {
-        return;
-      }
-
-      setDetectedSections([]);
-      setSectionDetectionStatus('error');
-      setSectionDetectionMessage(
-        error instanceof Error ? error.message : 'Section detection failed.',
-      );
-    }
+    await runSectionDetection(videoId, duration);
   }
 
   return (
