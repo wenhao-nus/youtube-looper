@@ -12,6 +12,7 @@ export type SongSectionsResponse = {
   status: Exclude<SectionDetectionStatus, 'idle' | 'loading'>;
   source: 'gemini';
   sections: DetectedSongSection[];
+  attemptedModels?: string[];
   message?: string;
 };
 
@@ -20,6 +21,9 @@ type DetectSongSectionsOptions = {
   videoUrl: string;
   videoDuration: number;
 };
+
+export const MAX_SECTION_DETECTION_SECONDS = 10 * 60;
+export const VIDEO_TOO_LONG_MESSAGE = 'Song section detection only supports videos up to 10 minutes.';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '/api';
 

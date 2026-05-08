@@ -1,4 +1,4 @@
-import { GoogleGenAI, MediaResolution } from '@google/genai';
+import { GoogleGenAI, MediaResolution, type GenerateContentParameters } from '@google/genai';
 import { extractSectionsFromGeminiText, type SongSection } from './sectionDetection.js';
 
 export type GeminiSectionResult =
@@ -6,10 +6,12 @@ export type GeminiSectionResult =
       ok: true;
       sections: SongSection[];
       model: string;
+      attemptedModels: string[];
     }
   | {
       ok: false;
       message: string;
+      attemptedModels: string[];
     };
 
 type DetectWithGeminiOptions = {
@@ -18,7 +20,10 @@ type DetectWithGeminiOptions = {
   videoUrl: string;
   videoDuration: number;
   timeoutMs: number;
+  generateContent?: GenerateContent;
 };
+
+type GenerateContent = (request: GenerateContentParameters) => Promise<{ text?: string }>;
 
 const RESPONSE_SCHEMA = {
   type: 'object',
@@ -26,7 +31,7 @@ const RESPONSE_SCHEMA = {
     sections: {
       type: 'array',
       minItems: 1,
-      maxItems: 12,
+      maxItems: 16,
       items: {
         type: 'object',
         properties: {
@@ -62,14 +67,19 @@ export async function detectSectionsWithGemini({
   videoUrl,
   videoDuration,
   timeoutMs,
+  generateContent,
 }: DetectWithGeminiOptions): Promise<GeminiSectionResult> {
-  const ai = new GoogleGenAI({ apiKey });
+  const ai = generateContent ? null : new GoogleGenAI({ apiKey });
+  const generate = generateContent ?? ((request) => ai!.models.generateContent(request));
   let transientError: unknown = null;
   let emptyResponseCount = 0;
+  const attemptedModels: string[] = [];
 
   for (const model of models) {
+    attemptedModels.push(model);
+
     try {
-      const response = await ai.models.generateContent({
+      const response = await generate({
         model,
         contents: [
           {
@@ -103,7 +113,7 @@ export async function detectSectionsWithGemini({
         continue;
       }
 
-      return { ok: true, sections, model };
+      return { ok: true, sections, model, attemptedModels };
     } catch (error) {
       if (!isTransientGeminiError(error)) {
         throw error;
@@ -117,20 +127,25 @@ export async function detectSectionsWithGemini({
     return {
       ok: false,
       message: 'Failed to generate section timestamps for the video.',
+      attemptedModels,
     };
   }
 
   return {
     ok: false,
     message: getTransientFailureMessage(transientError),
+    attemptedModels,
   };
 }
 
 function buildPrompt(videoDuration: number): string {
   return `
-Analyze this YouTube video's audio and return 4-10 major song sections.
+Analyze this YouTube video's audio and return 4-16 major song sections.
+You may return fewer than 4 sections only if you are very confident the song has fewer than 4 distinct major sections.
 Use only timestamps from this exact video. Do not use studio-track assumptions.
+Use the video's audio, transcript, description, and metadata. If useful, compare against the studio-track transcript or known release metadata, but keep the timestamps aligned to this exact video.
 Use labels: Intro, Verse, Pre-Chorus, Chorus, Bridge, Instrumental, Outro, Section.
+Use Section only as a fallback when the section is musically distinct but none of the named labels fit.
 Use MM:SS timestamps, clamp to 0-${Math.round(videoDuration)} seconds, and return JSON only.
 Confidence must describe boundary certainty:
 - high: clear audible transition and both start/end are easy to place
@@ -142,7 +157,7 @@ Do not mark every section high unless every boundary is clearly audible.
 
 function isTransientGeminiError(error: unknown): boolean {
   const status = getErrorStatus(error);
-  const message = error instanceof Error ? error.message : String(error);
+  const message = getErrorText(error);
 
   return (
     status === 429 ||
@@ -150,9 +165,12 @@ function isTransientGeminiError(error: unknown): boolean {
     status === 502 ||
     status === 503 ||
     status === 504 ||
-    message.includes('UNAVAILABLE') ||
-    message.includes('RESOURCE_EXHAUSTED') ||
-    message.includes('high demand')
+    message.toLowerCase().includes('unavailable') ||
+    message.toLowerCase().includes('resource_exhausted') ||
+    message.toLowerCase().includes('deadline_exceeded') ||
+    message.toLowerCase().includes('timed out') ||
+    message.toLowerCase().includes('timeout') ||
+    message.toLowerCase().includes('high demand')
   );
 }
 
@@ -171,6 +189,14 @@ function getErrorStatus(error: unknown): number | undefined {
     return value.code;
   }
 
+  if (typeof value.status === 'string') {
+    return mapErrorStatus(value.status);
+  }
+
+  if (typeof value.code === 'string') {
+    return mapErrorStatus(value.code);
+  }
+
   return undefined;
 }
 
@@ -179,11 +205,42 @@ function getTransientFailureMessage(error: unknown): string {
     return 'Gemini section detection is temporarily unavailable.';
   }
 
-  const message = error instanceof Error ? error.message : String(error);
+  const message = getErrorText(error);
 
-  if (message.includes('high demand')) {
+  if (message.toLowerCase().includes('high demand')) {
     return 'Gemini models are currently experiencing high demand. Please try again later.';
   }
 
   return 'Gemini section detection is temporarily unavailable. Please try again later.';
+}
+
+function getErrorText(error: unknown): string {
+  if (error instanceof Error) {
+    const structuredText = JSON.stringify(error, Object.getOwnPropertyNames(error));
+    return `${error.message} ${structuredText}`;
+  }
+
+  if (typeof error === 'string') {
+    return error;
+  }
+
+  return JSON.stringify(error);
+}
+
+function mapErrorStatus(status: string): number | undefined {
+  const normalizedStatus = status.toUpperCase();
+
+  if (normalizedStatus === 'RESOURCE_EXHAUSTED') {
+    return 429;
+  }
+
+  if (normalizedStatus === 'UNAVAILABLE') {
+    return 503;
+  }
+
+  if (normalizedStatus === 'DEADLINE_EXCEEDED') {
+    return 504;
+  }
+
+  return undefined;
 }
