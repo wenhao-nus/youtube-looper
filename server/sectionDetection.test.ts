@@ -19,6 +19,7 @@ test('normalizeSections clamps, sorts, labels, and ids sections', () => {
       { label: 'chorus', start: '0:33', end: '0:50', confidence: 'high' },
       { label: 'unknown', start: '0:05', end: '0:30', confidence: 'medium' },
       { label: 'verse', start: '0:29', end: '0:35', confidence: 'high' },
+      { label: 'post chorus', start: '0:50', end: '1:02', confidence: 'medium' },
       { label: 'bridge', start: '2:10', end: '2:40', confidence: 'high' },
     ],
     120,
@@ -29,6 +30,7 @@ test('normalizeSections clamps, sorts, labels, and ids sections', () => {
     [
       ['Section', 5, 30, 'medium'],
       ['Chorus', 33, 50, 'high'],
+      ['Post-Chorus', 50, 62, 'medium'],
     ],
   );
   assert.equal(sections[0].id, '1-section-5');
